@@ -289,9 +289,3 @@ graph TD
   * On every run: consolidates and publishes the unified `allure-results` artifact (retained for 30 days).
 
 ---
-
-## 👤 Author & Contact
-
-**Ishan Saha**  
-Staff Software Development Engineer in Test (SDET)  
-*Specializing in High-Reliability Test Architecture, Quality Engineering & Distributed Performance Systems.*

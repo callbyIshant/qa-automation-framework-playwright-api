@@ -1,0 +1,21 @@
+# ── Test Runner ──
+pytest>=7.4,<9.0
+pytest-xdist>=3.5
+pytest-html>=4.1
+
+# ── Reporting ──
+allure-pytest>=2.13
+
+# ── UI Automation ──
+playwright>=1.40
+pytest-playwright>=0.4
+
+# ── API Automation ──
+requests>=2.31
+jsonschema>=4.20
+pydantic>=2.5
+
+# ── Config & Utilities ──
+python-dotenv>=1.0
+
+# ── Load Testing (k6 installed separately) ──

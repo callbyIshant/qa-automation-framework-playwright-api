@@ -1,0 +1,40 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual Environment ──
+venv/
+.venv/
+env/
+
+# ── Environment / Secrets ──
+.env
+
+# ── Test Artifacts ──
+allure-results/
+allure-report/
+test-results/
+screenshots/
+traces/
+*.zip
+
+# ── IDE ──
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Playwright ──
+playwright-report/
+blob-report/
+
+# ── k6 ──
+performance/results/

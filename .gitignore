@@ -38,3 +38,8 @@ blob-report/
 
 # ── k6 ──
 performance/results/
+
+# Local AI Agent Context Files
+AGENT_CONTEXT.md
+DOM_REFERENCE.md
+

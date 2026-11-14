@@ -9,7 +9,6 @@ On ANY UI test failure, this conftest automatically captures:
 Complies with AGENT_CONTEXT rule #6 (FAILURE ARTIFACTS).
 """
 
-import os
 import pytest
 import allure
 from pathlib import Path
@@ -49,8 +48,8 @@ def context(browser_instance, request):
     # Start tracing BEFORE the test runs (screenshots + snapshots + sources)
     ctx.tracing.start(screenshots=True, snapshots=True, sources=True)
     yield ctx
-    # ── Post-test: capture artifacts on failure ──
-    _handle_failure_artifacts(request, ctx)
+    # ── Post-test: always stop tracing; capture artifacts only on failure ──
+    _handle_post_test(request, ctx)
     ctx.close()
 
 
@@ -62,51 +61,55 @@ def page(context):
 
 
 # ──────────────────────────────────────────────
-#  Failure-artifact helper
+#  Post-test helper — stop tracing & save on fail
 # ──────────────────────────────────────────────
 
-def _handle_failure_artifacts(request, ctx):
-    """Capture screenshot, trace, and URL when a test fails."""
-    # Determine if the test failed
-    if not hasattr(request.node, "rep_call"):
-        return
-    if not request.node.rep_call.failed:
-        return
+def _handle_post_test(request, ctx):
+    """Always stop tracing. On failure: save screenshot, trace, and URL."""
+    failed = hasattr(request.node, "rep_call") and request.node.rep_call.failed
 
-    # Build a sanitised test name for file paths
-    test_name = request.node.nodeid.replace("::", "_").replace("/", "_").replace("\\", "_")
-    artifacts_dir = ARTIFACTS_DIR / test_name
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    if failed:
+        test_name = (
+            request.node.nodeid
+            .replace("::", "_")
+            .replace("/", "_")
+            .replace("\\", "_")
+        )
+        artifacts_dir = ARTIFACTS_DIR / test_name
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    # Grab the first page in the context (if any)
-    pages = ctx.pages
-    if pages:
-        current_page = pages[0]
+        # Grab the first page in the context (if any)
+        pages = ctx.pages
+        if pages:
+            current_page = pages[0]
 
-        # 1. Screenshot
-        screenshot_path = artifacts_dir / "screenshot.png"
-        current_page.screenshot(path=str(screenshot_path), full_page=True)
+            # 1. Screenshot
+            screenshot_path = artifacts_dir / "screenshot.png"
+            current_page.screenshot(path=str(screenshot_path), full_page=True)
+            allure.attach.file(
+                str(screenshot_path),
+                name="failure-screenshot",
+                attachment_type=allure.attachment_type.PNG,
+            )
+
+            # 2. Current URL
+            allure.attach(
+                current_page.url,
+                name="failure-url",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+        # 3. Playwright Trace (stop + save)
+        trace_path = artifacts_dir / "trace.zip"
+        ctx.tracing.stop(path=str(trace_path))
         allure.attach.file(
-            str(screenshot_path),
-            name="failure-screenshot",
-            attachment_type=allure.attachment_type.PNG,
+            str(trace_path),
+            name="failure-trace",
+            attachment_type=allure.attachment_type.ZIP,
         )
-
-        # 2. Current URL
-        allure.attach(
-            current_page.url,
-            name="failure-url",
-            attachment_type=allure.attachment_type.TEXT,
-        )
-
-    # 3. Playwright Trace
-    trace_path = artifacts_dir / "trace.zip"
-    ctx.tracing.stop(path=str(trace_path))
-    allure.attach.file(
-        str(trace_path),
-        name="failure-trace",
-        attachment_type=allure.attachment_type.ZIP,
-    )
+    else:
+        # Discard the trace for passing tests (avoid resource leak)
+        ctx.tracing.stop()
 
 
 # ──────────────────────────────────────────────

@@ -15,10 +15,64 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 from config.settings import BASE_URL, HEADLESS, SLOW_MO, BROWSER
+from api_client.booking_client import BookingClient
 
 
 # ── Directory for failure artifacts ──
 ARTIFACTS_DIR = Path(__file__).parent / "test-results"
+
+
+# ──────────────────────────────────────────────
+#  API fixtures
+# ──────────────────────────────────────────────
+
+@pytest.fixture(scope="session")
+def booking_client():
+    """Session-scoped BookingClient instance."""
+    return BookingClient()
+
+
+@pytest.fixture(scope="session")
+def auth_token(booking_client):
+    """
+    Session-scoped auth token fixture for Restful-Booker API.
+    POST /auth with credentials from settings.
+    """
+    return booking_client.authenticate()
+
+
+@pytest.fixture
+def sample_booking_payload():
+    """Return a fresh valid booking payload dictionary."""
+    return {
+        "firstname": "John",
+        "lastname": "Doe",
+        "totalprice": 150,
+        "depositpaid": True,
+        "bookingdates": {
+            "checkin": "2026-05-01",
+            "checkout": "2026-05-05",
+        },
+        "additionalneeds": "Breakfast",
+    }
+
+
+@pytest.fixture
+def created_booking(booking_client, sample_booking_payload, auth_token):
+    """
+    Fixture that creates a booking for a test and cleans it up after.
+    Ensures 100% test isolation.
+    """
+    response = booking_client.create_booking(sample_booking_payload)
+    assert response.status_code == 200, f"Failed to create booking: {response.text}"
+    data = response.json()
+    booking_id = data["bookingid"]
+    yield {"bookingid": booking_id, "booking": data["booking"]}
+    # Teardown: attempt cleanup
+    try:
+        booking_client.delete_booking(booking_id, token=auth_token)
+    except Exception:
+        pass
 
 
 # ──────────────────────────────────────────────

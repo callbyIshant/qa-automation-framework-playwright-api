@@ -1,0 +1,129 @@
+name: QA Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  # ────────────────────────────────────────────────────────
+  # Job 1: Playwright UI Automation Suite
+  # ────────────────────────────────────────────────────────
+  ui-tests:
+    name: Playwright UI Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright Chromium with OS Dependencies
+        run: |
+          playwright install --with-deps chromium
+
+      - name: Run Playwright UI Tests
+        run: |
+          pytest tests/ui/ -v --alluredir=allure-results/ui
+        env:
+          BASE_URL: ${{ secrets.BASE_URL || 'https://www.saucedemo.com' }}
+          VALID_USER: ${{ secrets.VALID_USER || 'standard_user' }}
+          LOCKED_USER: ${{ secrets.LOCKED_USER || 'locked_out_user' }}
+          PASSWORD: ${{ secrets.PASSWORD || 'secret_sauce' }}
+          HEADLESS: "true"
+          BROWSER: "chromium"
+
+      - name: Upload UI Test Failure Artifacts & Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-failure-artifacts
+          path: test-results/
+          retention-days: 14
+
+      - name: Upload UI Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-ui
+          path: allure-results/ui
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────
+  # Job 2: REST API Automation Suite (Runs in Parallel)
+  # ────────────────────────────────────────────────────────
+  api-tests:
+    name: Restful-Booker API Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run REST API Tests
+        run: |
+          pytest tests/api/ -v --alluredir=allure-results/api
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL || 'https://restful-booker.herokuapp.com' }}
+          API_USERNAME: ${{ secrets.API_USERNAME || 'admin' }}
+          API_PASSWORD: ${{ secrets.API_PASSWORD || 'password123' }}
+
+      - name: Upload API Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-api
+          path: allure-results/api
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────
+  # Job 3: Consolidate & Publish Allure Results
+  # ────────────────────────────────────────────────────────
+  aggregate-allure-report:
+    name: Aggregate Allure Results
+    needs: [ui-tests, api-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download UI Allure Results
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-ui
+          path: allure-results
+
+      - name: Download API Allure Results
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-api
+          path: allure-results
+
+      - name: Upload Consolidated Allure Results Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: allure-results
+          retention-days: 30
